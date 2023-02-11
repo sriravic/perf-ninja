@@ -3,12 +3,13 @@
 #include <cstring>
 #include <omp.h>
 #include <vector>
+#include <new>
 
 std::size_t solution(const std::vector<uint32_t> &data, int thread_count) {
   // Using std::atomic counters to disallow compiler to promote `target`
   // memory location into a register. This way we ensure that the store
   // to `target` stays inside the loop.
-  struct Accumulator {
+  struct alignas(64) Accumulator {
     std::atomic<uint32_t> value = 0;
   };
   std::vector<Accumulator> accumulators(thread_count);
@@ -18,6 +19,7 @@ std::size_t solution(const std::vector<uint32_t> &data, int thread_count) {
   {
     int target_index = omp_get_thread_num();
     auto &target = accumulators[target_index];
+    int local = 0;
 
 #pragma omp for
     for (int i = 0; i < data.size(); i++) {
@@ -28,8 +30,11 @@ std::size_t solution(const std::vector<uint32_t> &data, int thread_count) {
       item |= (item >> 24);
 
       // Write result to accumulator
-      target.value += item % 13;
+      //target.value += item % 13;
+      local += item % 13;
     }
+
+    target.value = local;
   }
 
   std::size_t result = 0;
